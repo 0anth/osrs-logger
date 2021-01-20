@@ -10,7 +10,7 @@ repositories {
 	mavenCentral()
 }
 
-def runeLiteVersion = '1.6.35'
+def runeLiteVersion = '1.6.36.2'
 
 dependencies {
 	compileOnly group: 'net.runelite', name:'client', version: runeLiteVersion
@@ -19,11 +19,14 @@ dependencies {
 	annotationProcessor 'org.projectlombok:lombok:1.18.4'
 
 	testImplementation 'junit:junit:4.12'
-	testImplementation group: 'net.runelite', name:'client', version: runeLiteVersion
+	testImplementation 'org.slf4j:slf4j-simple:1.7.12'
+	testImplementation group: 'net.runelite', name:'client', version: runeLiteVersion, {
+		exclude group: 'ch.qos.logback', module: 'logback-classic'
+	}
 }
 
-group = 'com.example'
-version = '1.0-SNAPSHOT'
+group = 'com.osrslogger'
+version = '0.1-ALPHA'
 sourceCompatibility = '1.8'
 
 tasks.withType(JavaCompile) {
