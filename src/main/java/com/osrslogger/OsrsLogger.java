@@ -34,11 +34,15 @@ import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
+import net.runelite.api.ItemComposition;
 import net.runelite.api.NPC;
+import net.runelite.api.NPCComposition;
 import net.runelite.api.Player;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.NpcLootReceived;
+import net.runelite.client.game.ItemManager;
 import net.runelite.client.game.ItemStack;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
@@ -67,6 +71,15 @@ public class OsrsLogger extends Plugin
 	@Inject
 	private Client client;
 
+	@Inject
+	ItemManager itemManager;
+
+	@Inject
+	private ConfigManager configManager;
+
+	@Inject
+	ClientThread clientThread;
+
 	@Provides
 	OsrsLoggerConfig provideConfig(ConfigManager configManager)
 	{
@@ -90,16 +103,28 @@ public class OsrsLogger extends Plugin
 		}
 
 		boolean once = false;
+		int itemCount = 0;
 		Player player = client.getLocalPlayer();
+		NPCComposition npc = client.getNpcDefinition(npcId);
+		String jsonVersion = "0.2";
 
 		StringBuilder stringBuilder = new StringBuilder();
 		stringBuilder.append("{ ");
 
+		stringBuilder.append("\"version\" : ");
+		stringBuilder.append("\"").append(jsonVersion).append("\", ");
+
 		stringBuilder.append("\"player\" : ");
 		stringBuilder.append("\"").append(player.getName()).append("\", ");
 
-		stringBuilder.append("\"enemy\" : ");
+		stringBuilder.append("\"enemyId\" : ");
 		stringBuilder.append("\"").append(npcId).append("\", ");
+
+		stringBuilder.append("\"enemyName\" : ");
+		stringBuilder.append("\"").append(npc.getName()).append("\", ");
+
+		stringBuilder.append("\"enemyLevel\" : ");
+		stringBuilder.append("\"").append(npc.getCombatLevel()).append("\", ");
 
 		stringBuilder.append("\"authCode\" : ");
 		stringBuilder.append("\"").append(config.authCode()).append("\", ");
@@ -118,11 +143,25 @@ public class OsrsLogger extends Plugin
 				once = true;
 			}
 
-			int itemId = item.getId();
-			int qty = item.getQuantity();
+			itemCount++;
+			ItemComposition itemDef = itemManager.getItemComposition(item.getId());
 
-			stringBuilder.append("\"").append(itemId).append("\" : ");
-			stringBuilder.append("\"").append(qty).append("\"");
+			stringBuilder.append("\"").append(itemCount).append("\" : ");
+			stringBuilder.append(" { ");
+
+			stringBuilder.append("\"id\" : ");
+			stringBuilder.append("\"").append(item.getId()).append("\", ");
+
+			stringBuilder.append("\"name\" : ");
+			stringBuilder.append("\"").append(itemDef.getName()).append("\", ");
+
+			stringBuilder.append("\"qty\" : ");
+			stringBuilder.append("\"").append(item.getQuantity()).append("\", ");
+
+			stringBuilder.append("\"ha\" : ");
+			stringBuilder.append("\"").append(itemDef.getHaPrice()).append("\"");
+
+			stringBuilder.append(" }");
 		}
 
 		stringBuilder.append(" } }");
@@ -167,6 +206,15 @@ public class OsrsLogger extends Plugin
 			@Override
 			public void onResponse(Call call, Response response) throws IOException
 			{
+				switch (response.code()) {
+					case 400:
+						clientThread.invoke(() -> client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "<col=ff0000>OSRS Logger: Out of date! Please update to continue logging.</col>", null));
+						break;
+					case 401:
+						clientThread.invoke(() -> client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "<col=ff0000>OSRS Logger: Authorization code incorrect. Loot has not been logged.</col>", null));
+						configManager.setConfiguration("osrslootlogger", "authCode", "");
+						break;
+				}
 				response.close();
 			}
 		});
