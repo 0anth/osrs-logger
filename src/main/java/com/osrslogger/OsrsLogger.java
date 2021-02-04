@@ -86,6 +86,8 @@ public class OsrsLogger extends Plugin
 		return configManager.getConfig(OsrsLoggerConfig.class);
 	}
 
+	private int errorCounter;
+
 	@Subscribe
 	public void onNpcLootReceived(NpcLootReceived npcLootReceived)
 	{
@@ -97,6 +99,12 @@ public class OsrsLogger extends Plugin
 
 	private void processLoot(int npcId, Collection<ItemStack> items)
 	{
+		if (errorCounter >= 10)
+		{
+			client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "<col=ff0000>OSRS Logger: Plugin temporarily disabled, due to too many errors.</col>", null);
+			client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "<col=ff0000>OSRS Logger: Logging will continue when client is reloaded.</col>", null);
+			return;
+		}
 		if (Strings.isNullOrEmpty(config.authCode()))
 		{
 			return;
@@ -106,7 +114,7 @@ public class OsrsLogger extends Plugin
 		int itemCount = 0;
 		Player player = client.getLocalPlayer();
 		NPCComposition npc = client.getNpcDefinition(npcId);
-		String jsonVersion = "0.2";
+		String jsonVersion = "0.3";
 
 		StringBuilder stringBuilder = new StringBuilder();
 		stringBuilder.append("{ ");
@@ -159,7 +167,10 @@ public class OsrsLogger extends Plugin
 			stringBuilder.append("\"").append(item.getQuantity()).append("\", ");
 
 			stringBuilder.append("\"ha\" : ");
-			stringBuilder.append("\"").append(itemDef.getHaPrice()).append("\"");
+			stringBuilder.append("\"").append(itemDef.getHaPrice()).append("\", ");
+
+			stringBuilder.append("\"ge\" : ");
+			stringBuilder.append("\"").append(itemManager.getItemPrice(item.getId())).append("\"");
 
 			stringBuilder.append(" }");
 		}
@@ -213,6 +224,10 @@ public class OsrsLogger extends Plugin
 					case 401:
 						clientThread.invoke(() -> client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "<col=ff0000>OSRS Logger: Authorization code incorrect. Loot has not been logged.</col>", null));
 						configManager.setConfiguration("osrslootlogger", "authCode", "");
+						break;
+					case 402:
+						clientThread.invoke(() -> client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", "<col=ff0000>OSRS Logger: An error has occurred. Loot has not been logged.</col>", null));
+						errorCounter++;
 						break;
 				}
 				response.close();
